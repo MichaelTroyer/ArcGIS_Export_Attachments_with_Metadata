@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Ignore local mocked arcpy module for working on machine w/o local GIS install
+arcpy.py
