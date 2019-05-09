@@ -1,6 +1,7 @@
 import os
 import re
 
+import PIL.Image
 import arcpy
 import piexif
 
@@ -14,7 +15,7 @@ def text_to_ord(text):
 
 
 def update_exif_data(image_path, title=None, subject=None, author=None, keywords=None, comments=None):
-    with Image.open(image_path) as img:
+    with PIL.Image.open(image_path) as img:
         exif_dict = piexif.load(img.info['exif'])
 
         zeroth_ifd = {
@@ -83,6 +84,7 @@ class OutputAttachments(object):
             datatype="String",
             parameterType="Optional",
             direction="Input",
+            category='Update Photo Metadata',
             )
         metaSubject=arcpy.Parameter(
             displayName="Metadata Subject",
@@ -90,12 +92,14 @@ class OutputAttachments(object):
             datatype="String",
             parameterType="Optional",
             direction="Input",
+            category='Update Photo Metadata',
             )
         metaAuthor=arcpy.Parameter(
             displayName="Metadata Author",
             name="metaAuthor",
             datatype="String",
             parameterType="Optional",
+            category='Update Photo Metadata',
             direction="Input",
             )
         metaKeywords=arcpy.Parameter(
@@ -103,6 +107,7 @@ class OutputAttachments(object):
             name="metaKeywords",
             datatype="String",
             parameterType="Optional",
+            category='Update Photo Metadata',
             direction="Input",
             )
         metaComments=arcpy.Parameter(
@@ -110,6 +115,7 @@ class OutputAttachments(object):
             name="metaComments",
             datatype="String",
             parameterType="Optional",
+            category='Update Photo Metadata',
             direction="Input",
             )
 
@@ -141,7 +147,7 @@ class OutputAttachments(object):
 
         outDir = outDir.valueAsText
 
-        if any(metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments):
+        if any([metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments]):
             update_metadata = True
         else:
             update_metadata = False
@@ -172,8 +178,8 @@ class OutputAttachments(object):
                     try:
                         with open(image_path, 'wb') as f:
                             f.write(data)
-                    except:
-                        arcpy.AddMessage('[-] Error writing: {}'.format(image_path))
+                    except Exception as e:
+                        arcpy.AddMessage('[-] Error writing: {}\n{}'.format(image_path, e))
                     if update_metadata:
                         try:
                             update_exif_data(
@@ -184,6 +190,6 @@ class OutputAttachments(object):
                                 keywords=metaKeywords if metaKeywords else None,
                                 comments=metaComments if metaComments else None,
                                 )
-                        except:
-                            arcpy.AddMessage('[-] Error updating metadata: {}'.format(image_path))
+                        except Exception as e:
+                            arcpy.AddMessage('[-] Error updating metadata: {}\n{}'.format(image_path, e))
         return
