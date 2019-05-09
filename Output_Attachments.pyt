@@ -2,6 +2,35 @@ import os
 import re
 
 import arcpy
+import piexif
+
+
+def text_to_ord(text):
+    ords = []
+    for c in text:
+        ords.extend([ord(c), 0])
+    ords += [0,0]   
+    return ords
+
+
+def update_exif_data(image_path, title=None, subject=None, author=None, keywords=None, comments=None):
+    with Image.open(image_path) as img:
+        exif_dict = piexif.load(img.info['exif'])
+
+        zeroth_ifd = {
+            piexif.ImageIFD.XPKeywords: keywords,
+            piexif.ImageIFD.XPAuthor: author,
+            piexif.ImageIFD.XPTitle: title,
+            piexif.ImageIFD.XPSubject: subject,
+            piexif.ImageIFD.XPComment: comments,
+        }
+
+        for k, v in zeroth_ifd.items():
+            if v:
+                exif_dict['0th'][k] = text_to_ord(v)
+
+        exif_bytes = piexif.dump(exif_dict)
+        img.save(image_path, exif=exif_bytes)
 
 
 class Toolbox(object):
@@ -18,7 +47,6 @@ class OutputAttachments(object):
         self.canRunInBackground = True
 
     def getParameterInfo(self):
-        # inFeas, inRows, idFlds, outDir
                 
         inFeas=arcpy.Parameter(
             displayName="Input Feature Class",
@@ -27,7 +55,6 @@ class OutputAttachments(object):
             parameterType="Required",
             direction="Input",
             )
-
         inRows=arcpy.Parameter(
             displayName="Input Attachments Table",
             name="InRows",
@@ -35,7 +62,6 @@ class OutputAttachments(object):
             parameterType="Required",
             direction="Input",
             )
-        
         idFlds=arcpy.Parameter(
             displayName="Feature Class Attachment ID Fields",
             name="idFlds",
@@ -44,7 +70,6 @@ class OutputAttachments(object):
             direction="Input",
             multiValue=True,
             )
-
         outDir=arcpy.Parameter(
             displayName="Output Workspace",
             name="OutDir",
@@ -52,14 +77,52 @@ class OutputAttachments(object):
             parameterType="Required",
             direction="Input",
             )
+        metaTitle=arcpy.Parameter(
+            displayName="Metadata Title",
+            name="metaTitle",
+            datatype="String",
+            parameterType="Optional",
+            direction="Input",
+            )
+        metaSubject=arcpy.Parameter(
+            displayName="Metadata Subject",
+            name="metaSubject",
+            datatype="String",
+            parameterType="Optional",
+            direction="Input",
+            )
+        metaAuthor=arcpy.Parameter(
+            displayName="Metadata Author",
+            name="metaAuthor",
+            datatype="String",
+            parameterType="Optional",
+            direction="Input",
+            )
+        metaKeywords=arcpy.Parameter(
+            displayName="Metadata Keywords",
+            name="metaKeywords",
+            datatype="String",
+            parameterType="Optional",
+            direction="Input",
+            )
+        metaComments=arcpy.Parameter(
+            displayName="Metadata Comments",
+            name="metaComments",
+            datatype="String",
+            parameterType="Optional",
+            direction="Input",
+            )
 
-        return [inFeas, inRows, idFlds, outDir]
+        return [
+            inFeas, inRows, idFlds, outDir,
+            metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments
+            ]
 
     def isLicensed(self):
         return True
 
     def updateParameters(self, params):
-        inFC, inTbl, inFields, outDir = params
+        inFC, inTbl, inFields, outDir = params[:4]
         if inFC:
             fields = [f.name for f in arcpy.Describe(inFC).fields]
             inFields.filter.type = "ValueList"
@@ -74,7 +137,14 @@ class OutputAttachments(object):
         return
 
     def execute(self, params, messages):
-        inFC, inTbl, idFlds, outDir = params
+        inFC, inTbl, idFlds, outDir, metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments = params
+
+        outDir = outDir.valueAsText
+
+        if any(metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments):
+            update_metadata = True
+        else:
+            update_metadata = False
 
         # Make feature layer or table view
         if hasattr(arcpy.Describe(inFC.value), 'shapeType'):  # is a feature class
@@ -95,14 +165,25 @@ class OutputAttachments(object):
 
         with arcpy.da.SearchCursor('in_memory\\lyr', idFlds + dtFlds) as cur:
             for row in cur:
-                try:
-                    name = '_'.join([re.sub('[^0-9a-zA-Z-_.]+', '', str(r)) for r in row[:-1]])
-                    data = row[-1]
-                    if data:
-                        with open(os.path.join(outDir.valueAsText, name), 'wb') as f:
+                name = '_'.join([re.sub('[^0-9a-zA-Z-_.]+', '', str(r)) for r in row[:-1]])
+                image_path = os.path.join(outDir, name)
+                data = row[-1]
+                if data:
+                    try:
+                        with open(image_path, 'wb') as f:
                             f.write(data)
-                except:
-                    arcpy.AddMessage('[-] Error writing: {}'.format(repr(row)))
-                    
-
+                    except:
+                        arcpy.AddMessage('[-] Error writing: {}'.format(image_path))
+                    if update_metadata:
+                        try:
+                            update_exif_data(
+                                image_path,
+                                title=metaTitle if metaTitle else None,
+                                subject=metaSubject if metaSubject else None,
+                                author=metaAuthor if metaAuthor else None,
+                                keywords=metaKeywords if metaKeywords else None,
+                                comments=metaComments if metaComments else None,
+                                )
+                        except:
+                            arcpy.AddMessage('[-] Error updating metadata: {}'.format(image_path))
         return
