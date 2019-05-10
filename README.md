@@ -12,9 +12,12 @@ i.e.  [SITE_ID], [FEA_ID], [DATE] would become:
 5FN1234_Feature1_05102019_attachment3.jpg    etc..
 
 It also provides fields to add optional metadata to all the output photos:
+
 Title, Subject, Author, Keywords (tags), and Comments
 
 Multiple Authors and Keywords can be separated by a comma.
+
+
 
 
 
