@@ -7,18 +7,35 @@ import arcpy
 import piexif
 
 
-def text_to_ord(text):
-    ords = []
+"""
+Michael Troyer 20190508
+"""
+
+def text_to_unicode_points(text):
+    """
+    Convert text to unicode code points.
+    exif dict expects a sequence of code points seperated by nulls (0)
+    and ending with two nulls'
+    """
+    unicode_points = []
     for c in text:
-        ords.extend([ord(c), 0])
-    ords += [0,0]   
-    return ords
+        # add character and a null (0)
+        unicode_points.extend([ord(c), 0])
+    # Two nulls ends the string
+    unicode_points += [0,0]   
+    return unicode_points
 
 
 def update_exif_data(image_path, title=None, subject=None, author=None, keywords=None, comments=None):
+    """
+    Update photo exif data with title, subject, author, keywords, and comments.
+    Keywords and author can accept a string with individual entries seperated by a comma.
+    Will leave existing metadata intact. Will overwrite any existing values for provided metadata parameters.
+    """
     img = PIL.Image.open(image_path)
     exif_dict = piexif.load(img.info['exif'])
 
+    # All the relevant stuff is in the '0th' exif dict
     zeroth_ifd = {
         piexif.ImageIFD.XPKeywords: keywords,
         piexif.ImageIFD.XPAuthor: author,
@@ -29,7 +46,7 @@ def update_exif_data(image_path, title=None, subject=None, author=None, keywords
 
     for k, v in zeroth_ifd.items():
         if v:
-            exif_dict['0th'][k] = text_to_ord(v)
+            exif_dict['0th'][k] = text_to_unicode_points(v)
 
     exif_bytes = piexif.dump(exif_dict)
     img.save(image_path, exif=exif_bytes)
@@ -99,28 +116,28 @@ class OutputAttachments(object):
             category='Update Photo Metadata',
             )
         metaAuthor=arcpy.Parameter(
-            displayName="Metadata Author",
+            displayName="Metadata Author (separate multiple authors with a comma)",
             name="metaAuthor",
             datatype="String",
             parameterType="Optional",
-            category='Update Photo Metadata',
             direction="Input",
+            category='Update Photo Metadata',
             )
         metaKeywords=arcpy.Parameter(
-            displayName="Metadata Keywords",
+            displayName="Metadata Keywords (separate multiple keywords with a comma)",
             name="metaKeywords",
             datatype="String",
             parameterType="Optional",
-            category='Update Photo Metadata',
             direction="Input",
+            category='Update Photo Metadata',
             )
         metaComments=arcpy.Parameter(
             displayName="Metadata Comments",
             name="metaComments",
             datatype="String",
             parameterType="Optional",
-            category='Update Photo Metadata',
             direction="Input",
+            category='Update Photo Metadata',
             )
 
         return [
@@ -133,13 +150,16 @@ class OutputAttachments(object):
 
     def updateParameters(self, params):
         inFC, inTbl, inFields, outDir = params[:4]
-        if inFC:
+        if inFC.value:
+            # Get the list of fields to use to name output attachments
             fields = [f.name for f in arcpy.Describe(inFC).fields]
             inFields.filter.type = "ValueList"
             inFields.filter.list = fields
             if not inTbl.value:
+                # Default attachment table name
                 inTbl.value = inFC.valueAsText + '__ATTACH'
             if not outDir.value:
+                # Default output location is enclosing dir of fGDB
                 outDir.value = os.path.dirname(os.path.dirname(inFC.valueAsText))
         return
 
@@ -178,26 +198,27 @@ class OutputAttachments(object):
         # Assuming relation based on global ID! FK == "REL_GLOBALID"
         arcpy.AddJoin_management('in_memory\\lyr', "GlobalID", inTbl.value, "REL_GLOBALID")
 
-        output_pics = []
+        output_attachments = []
 
         with arcpy.da.SearchCursor('in_memory\\lyr', idFlds + dtFlds) as cur:
             for row in cur:
-                # Strip any non-alphanumeric + _ and .
+                # Strip any non-alphanumeric + _ and . to prevent naming issues
                 name = '_'.join([re.sub('[^0-9a-zA-Z-_.]+', '', str(r)) for r in row[:-1]])
-                image_path = os.path.join(outDir.valueAsText, name)
+                attachment_path = os.path.join(outDir.valueAsText, name)
                 data = row[-1]
                 if data:
                     try:
-                        with open(image_path, 'wb') as f:
+                        with open(attachment_path, 'wb') as f:
                             f.write(data)
-                            output_pics.append(image_path)
+                            output_attachments.append(attachment_path)
                     except Exception as e:
-                        arcpy.AddMessage('[-] Error writing: {}\n{}'.format(image_path, e))
+                        arcpy.AddMessage('[-] Error writing: {}\n{}'.format(attachment_path, e))
         if update_metadata:
-            for pic in output_pics:
+            # if a jpg
+            for attachment in (att for att in output_attachments if att.endswith('.jpg')):
                 try:
                     update_exif_data(
-                        pic,
+                        attachment,
                         title=metaTitle,
                         subject=metaSubject,
                         author=metaAuthor,
@@ -206,6 +227,6 @@ class OutputAttachments(object):
                         )
                 except Exception as e:
                     arcpy.AddMessage(
-                        '[-] Error updating metadata: {}\n{}'.format(pic, traceback.format_exc())
+                        '[-] Error updating metadata: {}\n{}'.format(attachment, traceback.format_exc())
                         )
         return
