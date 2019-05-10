@@ -8,7 +8,7 @@ Takes a feature class, an associated attachments table, and an output folder loc
 i.e.  [SITE_ID], [FEA_ID], [DATE] would become:
 
 5FN1234_Feature1_05102019_attachment1.jpg
-5FN1234_Feature1_05102019_attachment2.jpg  
+5FN1234_Feature1_05102019_attachment2.jpg
 5FN1234_Feature1_05102019_attachment3.jpg    etc..
 
 It also provides fields to add optional metadata to all the output photos:
