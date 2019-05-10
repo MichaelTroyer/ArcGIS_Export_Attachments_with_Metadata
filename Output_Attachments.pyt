@@ -1,5 +1,6 @@
 import os
 import re
+import traceback
 
 import PIL.Image
 import arcpy
@@ -15,24 +16,24 @@ def text_to_ord(text):
 
 
 def update_exif_data(image_path, title=None, subject=None, author=None, keywords=None, comments=None):
-    with PIL.Image.open(image_path) as img:
-        exif_dict = piexif.load(img.info['exif'])
+    img = PIL.Image.open(image_path)
+    exif_dict = piexif.load(img.info['exif'])
 
-        zeroth_ifd = {
-            piexif.ImageIFD.XPKeywords: keywords,
-            piexif.ImageIFD.XPAuthor: author,
-            piexif.ImageIFD.XPTitle: title,
-            piexif.ImageIFD.XPSubject: subject,
-            piexif.ImageIFD.XPComment: comments,
+    zeroth_ifd = {
+        piexif.ImageIFD.XPKeywords: keywords,
+        piexif.ImageIFD.XPAuthor: author,
+        piexif.ImageIFD.XPTitle: title,
+        piexif.ImageIFD.XPSubject: subject,
+        piexif.ImageIFD.XPComment: comments,
         }
 
-        for k, v in zeroth_ifd.items():
-            if v:
-                exif_dict['0th'][k] = text_to_ord(v)
+    for k, v in zeroth_ifd.items():
+        if v:
+            exif_dict['0th'][k] = text_to_ord(v)
 
-        exif_bytes = piexif.dump(exif_dict)
-        img.save(image_path, exif=exif_bytes)
-
+    exif_bytes = piexif.dump(exif_dict)
+    img.save(image_path, exif=exif_bytes)
+    img.close()
 
 class Toolbox(object):
     def __init__(self):
@@ -44,8 +45,11 @@ class Toolbox(object):
 class OutputAttachments(object):
     def __init__(self):
         self.label = "Output_Attachments"
-        self.description = "Output fGDB feature class attachments"
-        self.canRunInBackground = True
+        self.description = "Output fGDB feature class attachments and update metadata"
+        # THIS HAS TO RUN IN THE FOREGROUND
+        # Import PIL will crash the background processor!
+        # I don't know why. Stop asking. 
+        self.canRunInBackground = False
 
     def getParameterInfo(self):
                 
@@ -145,8 +149,13 @@ class OutputAttachments(object):
     def execute(self, params, messages):
         inFC, inTbl, idFlds, outDir, metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments = params
 
-        outDir = outDir.valueAsText
+        metaTitle = metaTitle.valueAsText
+        metaSubject = metaSubject.valueAsText
+        metaAuthor = metaAuthor.valueAsText
+        metaKeywords = metaKeywords.valueAsText
+        metaComments = metaComments.valueAsText
 
+        # If any metadata updates
         if any([metaTitle, metaSubject, metaAuthor, metaKeywords, metaComments]):
             update_metadata = True
         else:
@@ -166,30 +175,37 @@ class OutputAttachments(object):
         idFlds = ['{}.{}'.format(fcName, fld) for fld in idFlds.values]
         dtFlds = ['{}.{}'.format(tblName, fld) for fld in dtFlds]
 
-        # Add join
+        # Assuming relation based on global ID! FK == "REL_GLOBALID"
         arcpy.AddJoin_management('in_memory\\lyr', "GlobalID", inTbl.value, "REL_GLOBALID")
+
+        output_pics = []
 
         with arcpy.da.SearchCursor('in_memory\\lyr', idFlds + dtFlds) as cur:
             for row in cur:
+                # Strip any non-alphanumeric + _ and .
                 name = '_'.join([re.sub('[^0-9a-zA-Z-_.]+', '', str(r)) for r in row[:-1]])
-                image_path = os.path.join(outDir, name)
+                image_path = os.path.join(outDir.valueAsText, name)
                 data = row[-1]
                 if data:
                     try:
                         with open(image_path, 'wb') as f:
                             f.write(data)
+                            output_pics.append(image_path)
                     except Exception as e:
                         arcpy.AddMessage('[-] Error writing: {}\n{}'.format(image_path, e))
-                    if update_metadata:
-                        try:
-                            update_exif_data(
-                                image_path,
-                                title=metaTitle if metaTitle else None,
-                                subject=metaSubject if metaSubject else None,
-                                author=metaAuthor if metaAuthor else None,
-                                keywords=metaKeywords if metaKeywords else None,
-                                comments=metaComments if metaComments else None,
-                                )
-                        except Exception as e:
-                            arcpy.AddMessage('[-] Error updating metadata: {}\n{}'.format(image_path, e))
+        if update_metadata:
+            for pic in output_pics:
+                try:
+                    update_exif_data(
+                        pic,
+                        title=metaTitle,
+                        subject=metaSubject,
+                        author=metaAuthor,
+                        keywords=metaKeywords,
+                        comments=metaComments,
+                        )
+                except Exception as e:
+                    arcpy.AddMessage(
+                        '[-] Error updating metadata: {}\n{}'.format(pic, traceback.format_exc())
+                        )
         return

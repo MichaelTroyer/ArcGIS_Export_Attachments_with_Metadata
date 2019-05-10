@@ -104,6 +104,8 @@ venv.bak/
 .mypy_cache/
 
 
-# skip the location specific piexif install
+# skip the location specific piexif and PIL installs
 piexif/
 piexif-1.1.2.dist-info/
+PIL
+Pillow-6.0.0.dist-info
