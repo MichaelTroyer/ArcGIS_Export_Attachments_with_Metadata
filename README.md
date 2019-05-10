@@ -28,4 +28,5 @@ Multiple Authors and Keywords can be separated by a comma.
 ## Pics_to_Feature_Class.pyt
 
 Takes geotagged photographs and creates a database and point feature class and adds the photos as attachments.
-*ESRI also implmented this, which I didn't realize when I wrote this one.. Ah nuts.. :+1:
+* ESRI also implmented this, which I didn't realize when I wrote this one.. Ah nuts.. 
+:+1:
