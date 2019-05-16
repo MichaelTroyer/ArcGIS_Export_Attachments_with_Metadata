@@ -1,10 +1,6 @@
-# ArcGIS_GDB_Attachment_Tools
-ArcGIS File Geodatabase Attachment Tools
+# ArcGIS GDB Export Attachments with Metadata
 
-
-## Output_Attachments.pyt:
-
-Takes a feature class, an associated attachments table, and an output folder location and batch exports all the attachments while allowing you to select fields from the feature class, whose values will be used to name the output attachments:
+A Python toolbox that takes a feature class, an associated attachments table, and an output folder location and batch exports all the attachments while allowing you to select fields from the feature class, whose values will be used to name the output attachments:
 
 i.e.  [SITE_ID], [FEA_ID], [DATE] would become:
 
@@ -14,7 +10,7 @@ i.e.  [SITE_ID], [FEA_ID], [DATE] would become:
 
 - 5FN1234_Feature1_05102019_attachment3.jpg    etc..
 
-It also provides fields to add optional metadata to all the output photos:
+The tool also provides fields to add optional photo metadata to all the outputs (jpegs only):
 
 - Title
 - Subject
