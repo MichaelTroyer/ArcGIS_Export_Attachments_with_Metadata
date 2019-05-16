@@ -1,4 +1,4 @@
-# ArcGIS GDB Export Attachments with Metadata
+# ArcGIS Export Attachments with Metadata
 
 A Python toolbox that takes a feature class, an associated attachments table, and an output folder location and batch exports all the attachments while allowing you to select fields from the feature class, whose values will be used to name the output attachments:
 
