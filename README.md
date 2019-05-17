@@ -19,3 +19,6 @@ The tool also provides fields to add optional photo metadata to all the outputs 
 - Comments
 
 Multiple Authors and Keywords can be separated by a comma.
+
+
+Note: requires piexif and pillow
